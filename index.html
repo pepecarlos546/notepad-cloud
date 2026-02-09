@@ -2,35 +2,173 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mi Notepad Nube</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notepad Cloud-Lite</title>
     <style>
-        body { background: #1e1e1e; color: white; font-family: sans-serif; margin: 0; padding: 20px; }
-        textarea {
-            width: 100%; height: 85vh;
-            background: #252526; color: #d4d4d4;
-            border: 1px solid #333; border-radius: 8px;
-            padding: 15px; font-size: 18px; outline: none; resize: none;
+        /* Estilos minimalistas y oscuros para no cansar la vista */
+        :root {
+            --bg-color: #0f0f0f;
+            --panel-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --accent-color: #0078d4;
+            --border-color: #333;
         }
-        .status { margin-bottom: 10px; font-size: 12px; color: #888; text-align: right; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Barra de herramientas superior */
+        .toolbar {
+            background-color: var(--panel-color);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .logo {
+            font-weight: bold;
+            color: var(--accent-color);
+            letter-spacing: 1px;
+        }
+
+        select, button {
+            background-color: #333;
+            color: white;
+            border: 1px solid #444;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        select:hover, button:hover {
+            background-color: #444;
+            border-color: var(--accent-color);
+        }
+
+        /* Área de escritura */
+        textarea {
+            flex-grow: 1;
+            background-color: var(--bg-color);
+            color: #ffffff;
+            border: none;
+            padding: 30px;
+            font-size: 18px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            outline: none;
+            resize: none;
+            line-height: 1.6;
+        }
+
+        /* Estado inferior */
+        .footer {
+            background-color: var(--panel-color);
+            padding: 5px 20px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid var(--border-color);
+        }
+
+        #status { color: #4caf50; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="status" id="status">Guardado automáticamente</div>
-    <textarea id="notepad" placeholder="Empieza a escribir..."></textarea>
+
+    <div class="toolbar">
+        <span class="logo">CLOUDPAD</span>
+        
+        <select id="formatSelector">
+            <option value=".txt">Archivo de Texto (.txt)</option>
+            <option value=".md">Markdown (.md)</option>
+            <option value=".html">Página Web (.html)</option>
+            <option value=".js">Javascript (.js)</option>
+        </select>
+
+        <button onclick="descargarNota()">Descargar Archivo</button>
+        
+        <div style="margin-left: auto; display: flex; gap: 20px;">
+            <span id="charCount">Caracteres: 0</span>
+            <span id="status">SINCRONIZADO</span>
+        </div>
+    </div>
+
+    <textarea id="editor" placeholder="Empieza a escribir tus ideas aquí..."></textarea>
+
+    <div class="footer">
+        <span>Almacenamiento Local Activo (0MB en disco)</span>
+        <span>Presiona 'Descargar' para guardar una copia física</span>
+    </div>
 
     <script>
-        const editor = document.getElementById('notepad');
+        const editor = document.getElementById('editor');
         const status = document.getElementById('status');
+        const charCount = document.getElementById('charCount');
+        const formatSelector = document.getElementById('formatSelector');
 
-        // Cargar texto guardado
-        editor.value = localStorage.getItem('mi_nota') || "";
+        // 1. CARGAR DATOS AL INICIAR
+        window.onload = () => {
+            const savedData = localStorage.getItem('mi_nota_app');
+            if (savedData) {
+                editor.value = savedData;
+                actualizarMetricas();
+            }
+        };
 
-        // Guardar automáticamente mientras escribes
+        // 2. GUARDADO AUTOMÁTICO Y MÉTRICAS
         editor.addEventListener('input', () => {
-            localStorage.setItem('mi_nota', editor.value);
-            status.innerText = "Escribiendo...";
-            setTimeout(() => { status.innerText = "Guardado en local"; }, 1000);
+            localStorage.setItem('mi_nota_app', editor.value);
+            
+            status.innerText = "GUARDANDO...";
+            status.style.color = "#ff9800";
+            
+            actualizarMetricas();
+
+            // Simular delay de guardado visual
+            setTimeout(() => {
+                status.innerText = "SINCRONIZADO";
+                status.style.color = "#4caf50";
+            }, 800);
         });
+
+        function actualizarMetricas() {
+            charCount.innerText = `Caracteres: ${editor.value.length}`;
+        }
+
+        // 3. FUNCIÓN DE DESCARGA
+        function descargarNota() {
+            const contenido = editor.value;
+            const extension = formatSelector.value;
+            const nombreArchivo = "mi_nota_nube" + extension;
+
+            // Crear el "Blob" (el archivo en memoria)
+            const blob = new Blob([contenido], { type: 'text/plain' });
+            
+            // Crear un link temporal de descarga
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = nombreArchivo;
+            
+            // Simular el click y borrar el link
+            link.click();
+            window.URL.revokeObjectURL(link.href);
+
+            status.innerText = "¡ARCHIVO EXPORTADO!";
+            setTimeout(() => { status.innerText = "SINCRONIZADO"; }, 2000);
+        }
     </script>
 </body>
 </html>
