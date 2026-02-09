@@ -2,143 +2,109 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Notepad ligero</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notepad Ultra</title>
+    <link rel="manifest" id="my-manifest">
+    <meta name="theme-color" content="#161b22">
+    
     <style>
-        :root {
-            --bg: #0d1117;
-            --panel: #161b22;
-            --text: #c9d1d9;
-            --accent: #238636;
-            --border: #30363d;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        .toolbar {
-            background-color: var(--panel);
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        input[type="text"], button {
-            background: #21262d;
-            color: white;
-            border: 1px solid var(--border);
-            padding: 6px 10px;
-            border-radius: 6px;
-            outline: none;
-        }
-
-        input[type="text"]:focus { border-color: #58a6ff; }
-
-        button { 
-            cursor: pointer; 
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        button:hover { background: #30363d; border-color: #8b949e; }
-        .btn-save { background: var(--accent); border-color: rgba(240,246,252,0.1); }
-        .btn-save:hover { background: #2ea043; }
-
-        textarea {
-            flex-grow: 1;
-            background: var(--bg);
-            color: #e6edf3;
-            border: none;
-            padding: 20px;
-            font-size: 18px;
-            font-family: 'Cascadia Code', 'Consolas', monospace;
-            outline: none;
-            resize: none;
-        }
-
-        .status-bar {
-            background: var(--panel);
-            font-size: 12px;
-            padding: 5px 20px;
-            color: #8b949e;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-        }
+        :root { --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --accent: #238636; --border: #30363d; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        .toolbar { background: var(--panel); padding: 10px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+        
+        button, input { background: #21262d; color: white; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #30363d; }
+        #installBtn { background: #0078d4; border: none; display: none; font-weight: bold; } /* Oculto por defecto */
+        
+        textarea { flex-grow: 1; background: var(--bg); color: #e6edf3; border: none; padding: 20px; font-size: 18px; font-family: 'Consolas', monospace; outline: none; resize: none; }
+        .footer { font-size: 11px; padding: 5px 20px; color: #8b949e; background: var(--panel); display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
 
     <div class="toolbar">
-        <button onclick="document.getElementById('fileOpener').click()">📂 Abrir</button>
-        <input type="file" id="fileOpener" style="display:none" onchange="cargarArchivo(this)">
+        <b style="color: #58a6ff;">NOTEPAD</b>
+        <button onclick="document.getElementById('openFile').click()">📂 Abrir</button>
+        <input type="file" id="openFile" style="display:none" onchange="leer(this)">
         
-        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
-            <span>Extensión:</span>
-            <input type="text" id="extInput" value=".txt" style="width: 60px; text-align: center;" placeholder=".bat">
-            
-            <button class="btn-save" onclick="guardarArchivo()">💾 Descargar</button>
-        </div>
+        <input type="text" id="ext" value=".txt" style="width: 50px; text-align: center;">
+        <button onclick="bajar()" style="background: var(--accent);">💾 Guardar</button>
+        
+        <button id="installBtn">➕ INSTALAR APP</button>
     </div>
 
-    <textarea id="mainEditor" placeholder="Escribe aquí..."></textarea>
+    <textarea id="editor" placeholder="Escribe algo..."></textarea>
 
-    <div class="status-bar">
-        <span id="fileInfo">Archivo nuevo</span>
-        <span id="autoSaveMsg">Sincronizado en local</span>
+    <div class="footer">
+        <span id="info">Listo para trabajar</span>
+        <span>Guardado local activo</span>
     </div>
 
     <script>
-        const editor = document.getElementById('mainEditor');
-        const extInput = document.getElementById('extInput');
-        const fileInfo = document.getElementById('fileInfo');
+        const editor = document.getElementById('editor');
+        const installBtn = document.getElementById('installBtn');
+        let deferredPrompt;
 
-        // Cargar lo último escrito al abrir la app
+        // 1. Guardado automático local
         window.onload = () => {
-            editor.value = localStorage.getItem('custom_notepad_content') || "";
+            editor.value = localStorage.getItem('ultra_note') || "";
         };
-
-        // Guardado automático en el navegador
         editor.addEventListener('input', () => {
-            localStorage.setItem('custom_notepad_content', editor.value);
+            localStorage.setItem('ultra_note', editor.value);
         });
 
-        // Abrir archivo existente
-        function cargarArchivo(input) {
-            const file = input.files[0];
-            if (!file) return;
+        // 2. Lógica de Instalación (PWA)
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block'; // Mostrar botón si es instalable
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        // 3. Funciones de archivo
+        function leer(input) {
+            const f = input.files[0];
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = (e) => { 
                 editor.value = e.target.result;
-                fileInfo.innerText = "Editando: " + file.name;
-                // Intentar extraer la extensión automáticamente del archivo abierto
-                const ext = file.name.substring(file.name.lastIndexOf('.'));
-                if(ext) extInput.value = ext;
+                document.getElementById('info').innerText = "Editando: " + f.name;
             };
-            reader.readAsText(file);
+            reader.readAsText(f);
         }
 
-        // Descargar con extensión personalizada
-        function guardarArchivo() {
-            const contenido = editor.value;
-            const extension = extInput.value.startsWith('.') ? extInput.value : '.' + extInput.value;
-            const nombreFinal = "archivo_creado" + extension;
-
-            const blob = new Blob([contenido], { type: 'text/plain' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = nombreFinal;
-            link.click();
-            URL.revokeObjectURL(link.href);
+        function bajar() {
+            const blob = new Blob([editor.value], {type: 'text/plain'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = "nota" + document.getElementById('ext').value;
+            a.click();
         }
+
+        // Crear el manifiesto "al vuelo" para que funcione sin archivos extra
+        const manifest = {
+            "short_name": "Notepad",
+            "name": "Notepad lijero",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#0d1117",
+            "theme_color": "#161b22",
+            "icons": [{
+                "src": "https://cdn-icons-png.flaticon.com/512/2593/2593549.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            }]
+        };
+        document.getElementById('my-manifest').setAttribute('href', 'data:application/manifest+json;base64,' + btoa(JSON.stringify(manifest)));
     </script>
 </body>
 </html>
