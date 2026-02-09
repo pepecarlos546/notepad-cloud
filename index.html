@@ -3,108 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notepad Ultra</title>
-    <link rel="manifest" id="my-manifest">
-    <meta name="theme-color" content="#161b22">
-    
+    <title>CloudPad | Google Drive Edition</title>
     <style>
-        :root { --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --accent: #238636; --border: #30363d; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        .toolbar { background: var(--panel); padding: 10px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+        :root { --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --accent: #238636; --border: #30363d; --blue: #58a6ff; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         
-        button, input { background: #21262d; color: white; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #30363d; }
-        #installBtn { background: #0078d4; border: none; display: none; font-weight: bold; } /* Oculto por defecto */
+        .toolbar { background: var(--panel); padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .logo { font-weight: bold; color: var(--blue); letter-spacing: 1px; font-size: 14px; }
         
-        textarea { flex-grow: 1; background: var(--bg); color: #e6edf3; border: none; padding: 20px; font-size: 18px; font-family: 'Consolas', monospace; outline: none; resize: none; }
-        .footer { font-size: 11px; padding: 5px 20px; color: #8b949e; background: var(--panel); display: flex; justify-content: space-between; }
+        button, input { background: #21262d; color: white; border: 1px solid var(--border); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        button:hover { background: #30363d; border-color: #8b949e; }
+        
+        #loginBtn { background: #0078d4; border: none; font-weight: bold; color: white; }
+        #saveDriveBtn { background: var(--accent); border: none; font-weight: bold; display: none; }
+        
+        textarea { flex-grow: 1; background: var(--bg); color: #e6edf3; border: none; padding: 25px; font-size: 18px; font-family: 'Consolas', 'Monaco', monospace; outline: none; resize: none; line-height: 1.6; }
+        
+        .status-bar { font-size: 12px; padding: 6px 20px; background: var(--panel); color: #8b949e; display: flex; justify-content: space-between; border-top: 1px solid var(--border); }
+        #status-text { color: var(--blue); }
     </style>
 </head>
 <body>
 
     <div class="toolbar">
-        <b style="color: #58a6ff;">NOTEPAD</b>
-        <button onclick="document.getElementById('openFile').click()">📂 Abrir</button>
-        <input type="file" id="openFile" style="display:none" onchange="leer(this)">
-        
-        <input type="text" id="ext" value=".txt" style="width: 50px; text-align: center;">
-        <button onclick="bajar()" style="background: var(--accent);">💾 Guardar</button>
-        
-        <button id="installBtn">➕ INSTALAR APP</button>
+        <span class="logo">CLOUDPAD DRIVE</span>
+        <button id="loginBtn" onclick="handleAuthClick()">🔑 Conectar Google Drive</button>
+        <button id="saveDriveBtn" onclick="guardarEnDrive()">☁️ Guardar en Drive</button>
+        <input type="text" id="ext" value=".txt" style="width: 50px; text-align: center;" title="Extensión personalizada">
+        <span class="status-bar" style="border:none; background:transparent; margin-left:auto;">
+            <span id="status-text">Desconectado</span>
+        </span>
     </div>
 
-    <textarea id="editor" placeholder="Escribe algo..."></textarea>
+    <textarea id="editor" placeholder="Escribe aquí tus notas... Se guardarán localmente hasta que las subas a Drive."></textarea>
 
-    <div class="footer">
-        <span id="info">Listo para trabajar</span>
-        <span>Guardado local activo</span>
+    <div class="status-bar">
+        <span>© 2026 CloudPad Pro - 0MB en Disco</span>
+        <span id="char-count">Caracteres: 0</span>
     </div>
+
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
     <script>
-        const editor = document.getElementById('editor');
-        const installBtn = document.getElementById('installBtn');
-        let deferredPrompt;
+        // CREDENCIALES INTEGRADAS
+        const CLIENT_ID = '565820507464-v1skrihu7npm106vg52tm9tjcfjb1an9.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDaRRsfvcG4FTzBYDiKPnNYD5-C_VP40qc';
+        
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-        // 1. Guardado automático local
-        window.onload = () => {
-            editor.value = localStorage.getItem('ultra_note') || "";
-        };
-        editor.addEventListener('input', () => {
-            localStorage.setItem('ultra_note', editor.value);
-        });
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
 
-        // 2. Lógica de Instalación (PWA)
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            installBtn.style.display = 'block'; // Mostrar botón si es instalable
-        });
+        function gapiLoaded() { gapi.load('client', async () => { await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] }); gapiInited = true; }); }
+        function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: '' }); gisInited = true; }
 
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    installBtn.style.display = 'none';
-                }
-                deferredPrompt = null;
-            }
-        });
-
-        // 3. Funciones de archivo
-        function leer(input) {
-            const f = input.files[0];
-            const reader = new FileReader();
-            reader.onload = (e) => { 
-                editor.value = e.target.result;
-                document.getElementById('info').innerText = "Editando: " + f.name;
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) throw (resp);
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('saveDriveBtn').style.display = 'block';
+                document.getElementById('status-text').innerText = "CONECTADO A DRIVE";
+                document.getElementById('status-text').style.color = "#2ea043";
             };
-            reader.readAsText(f);
+            tokenClient.requestAccessToken({prompt: 'consent'});
         }
 
-        function bajar() {
-            const blob = new Blob([editor.value], {type: 'text/plain'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = "nota" + document.getElementById('ext').value;
-            a.click();
+        async function guardarEnDrive() {
+            const status = document.getElementById('status-text');
+            status.innerText = "SUBIENDO...";
+            
+            const contenido = document.getElementById('editor').value;
+            const extension = document.getElementById('ext').value;
+            const nombre = "nota_nube_" + Date.now() + (extension.startsWith('.') ? extension : '.' + extension);
+            
+            const metadata = { 'name': nombre, 'mimeType': 'text/plain' };
+            const file = new Blob([contenido], {type: 'text/plain'});
+            
+            try {
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+                form.append('file', file);
+
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }),
+                    body: form
+                });
+
+                if (response.ok) {
+                    status.innerText = "¡GUARDADO EN DRIVE!";
+                    setTimeout(() => { status.innerText = "CONECTADO"; }, 3000);
+                } else { throw new Error(); }
+            } catch (err) {
+                status.innerText = "ERROR AL GUARDAR";
+                status.style.color = "#f85149";
+            }
         }
 
-        // Crear el manifiesto "al vuelo" para que funcione sin archivos extra
-        const manifest = {
-            "short_name": "Notepad",
-            "name": "Notepad lijero",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#0d1117",
-            "theme_color": "#161b22",
-            "icons": [{
-                "src": "https://cdn-icons-png.flaticon.com/512/2593/2593549.png",
-                "sizes": "512x512",
-                "type": "image/png"
-            }]
+        // Sistema de respaldo local y métricas
+        const editor = document.getElementById('editor');
+        editor.addEventListener('input', () => {
+            localStorage.setItem('cloudpad_temp', editor.value);
+            document.getElementById('char-count').innerText = "Caracteres: " + editor.value.length;
+        });
+        window.onload = () => { 
+            editor.value = localStorage.getItem('cloudpad_temp') || ""; 
+            document.getElementById('char-count').innerText = "Caracteres: " + editor.value.length;
         };
-        document.getElementById('my-manifest').setAttribute('href', 'data:application/manifest+json;base64,' + btoa(JSON.stringify(manifest)));
     </script>
 </body>
 </html>
