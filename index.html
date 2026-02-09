@@ -2,158 +2,142 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notepad Pro | Editor Nube</title>
+    <title>Notepad Ultra-Custom</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-color: #1e1e1e;
-            --text-color: #d4d4d4;
-            --accent-color: #0078d4;
-            --border-color: #333;
+            --bg: #0d1117;
+            --panel: #161b22;
+            --text: #c9d1d9;
+            --accent: #238636;
+            --border: #30363d;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
             margin: 0;
             display: flex;
             flex-direction: column;
             height: 100vh;
-            overflow: hidden;
         }
 
         .toolbar {
-            background-color: var(--panel-color);
-            padding: 8px 15px;
+            background-color: var(--panel);
+            padding: 10px 20px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            border-bottom: 1px solid var(--border-color);
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .btn-group { display: flex; gap: 5px; }
-
-        button, select {
-            background-color: #2d2d2d;
+        input[type="text"], button {
+            background: #21262d;
             color: white;
-            border: 1px solid #444;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            border-radius: 6px;
+            outline: none;
         }
 
-        button:hover { background-color: #3d3d3d; border-color: var(--accent-color); }
+        input[type="text"]:focus { border-color: #58a6ff; }
 
-        /* Input de archivo oculto */
-        #fileInput { display: none; }
+        button { 
+            cursor: pointer; 
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover { background: #30363d; border-color: #8b949e; }
+        .btn-save { background: var(--accent); border-color: rgba(240,246,252,0.1); }
+        .btn-save:hover { background: #2ea043; }
 
         textarea {
             flex-grow: 1;
-            background-color: var(--bg-color);
-            color: #ffffff;
+            background: var(--bg);
+            color: #e6edf3;
             border: none;
-            padding: 25px;
-            font-size: 17px;
-            font-family: 'Consolas', monospace;
+            padding: 20px;
+            font-size: 18px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
             outline: none;
             resize: none;
-            line-height: 1.5;
         }
 
-        .footer {
-            background-color: var(--panel-color);
-            padding: 4px 15px;
-            font-size: 11px;
-            color: #777;
+        .status-bar {
+            background: var(--panel);
+            font-size: 12px;
+            padding: 5px 20px;
+            color: #8b949e;
+            border-top: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
-            border-top: 1px solid var(--border-color);
         }
-
-        #status { color: #4caf50; }
     </style>
 </head>
 <body>
 
     <div class="toolbar">
-        <b style="color:var(--accent-color); margin-right:10px;">EDITOR</b>
+        <button onclick="document.getElementById('fileOpener').click()">📂 Abrir</button>
+        <input type="file" id="fileOpener" style="display:none" onchange="cargarArchivo(this)">
         
-        <div class="btn-group">
-            <button onclick="document.getElementById('fileInput').click()">📂 Abrir</button>
-            <input type="file" id="fileInput" accept=".txt,.md,.html,.js,.css" onchange="leerArchivo(this)">
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+            <span>Extensión:</span>
+            <input type="text" id="extInput" value=".txt" style="width: 60px; text-align: center;" placeholder=".bat">
             
-            <button onclick="descargarNota()" style="background: var(--accent-color);">💾 Guardar Como</button>
+            <button class="btn-save" onclick="guardarArchivo()">💾 Descargar</button>
         </div>
-
-        <select id="formatSelector">
-            <option value=".txt">.txt</option>
-            <option value=".md">.md</option>
-            <option value=".html">.html</option>
-        </select>
-
-        <span id="status" style="margin-left:auto;">Listo</span>
     </div>
 
-    <textarea id="editor" placeholder="Escribe aquí o arrastra un archivo..."></textarea>
+    <textarea id="mainEditor" placeholder="Escribe aquí..."></textarea>
 
-    <div class="footer">
-        <span id="fileNameDisplay">Archivo: Nuevo Documento</span>
-        <span id="charCount">Caracteres: 0</span>
+    <div class="status-bar">
+        <span id="fileInfo">Archivo nuevo</span>
+        <span id="autoSaveMsg">Sincronizado en local</span>
     </div>
 
     <script>
-        const editor = document.getElementById('editor');
-        const status = document.getElementById('status');
-        const charCount = document.getElementById('charCount');
-        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const editor = document.getElementById('mainEditor');
+        const extInput = document.getElementById('extInput');
+        const fileInfo = document.getElementById('fileInfo');
 
-        // Cargar última sesión
+        // Cargar lo último escrito al abrir la app
         window.onload = () => {
-            const saved = localStorage.getItem('nota_pro_data');
-            if (saved) editor.value = saved;
-            actualizarMetricas();
+            editor.value = localStorage.getItem('custom_notepad_content') || "";
         };
 
-        // Guardado automático
+        // Guardado automático en el navegador
         editor.addEventListener('input', () => {
-            localStorage.setItem('nota_pro_data', editor.value);
-            actualizarMetricas();
-            status.innerText = "Escribiendo...";
-            setTimeout(() => status.innerText = "Sincronizado", 500);
+            localStorage.setItem('custom_notepad_content', editor.value);
         });
 
-        function actualizarMetricas() {
-            charCount.innerText = `Caracteres: ${editor.value.length}`;
-        }
-
-        // --- FUNCIÓN PARA LEER ARCHIVOS ---
-        function leerArchivo(input) {
-            const archivo = input.files[0];
-            if (!archivo) return;
-
-            const lector = new FileReader();
-            lector.onload = (e) => {
-                const contenido = e.target.result;
-                editor.value = contenido; // Ponemos el texto en el editor
-                localStorage.setItem('nota_pro_data', contenido); // Guardamos en memoria
-                fileNameDisplay.innerText = `Archivo: ${archivo.name}`;
-                status.innerText = "Archivo Cargado";
-                actualizarMetricas();
+        // Abrir archivo existente
+        function cargarArchivo(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                editor.value = e.target.result;
+                fileInfo.innerText = "Editando: " + file.name;
+                // Intentar extraer la extensión automáticamente del archivo abierto
+                const ext = file.name.substring(file.name.lastIndexOf('.'));
+                if(ext) extInput.value = ext;
             };
-            lector.readAsText(archivo);
+            reader.readAsText(file);
         }
 
-        // --- FUNCIÓN PARA DESCARGAR ---
-        function descargarNota() {
-            const blob = new Blob([editor.value], { type: 'text/plain' });
+        // Descargar con extensión personalizada
+        function guardarArchivo() {
+            const contenido = editor.value;
+            const extension = extInput.value.startsWith('.') ? extInput.value : '.' + extInput.value;
+            const nombreFinal = "archivo_creado" + extension;
+
+            const blob = new Blob([contenido], { type: 'text/plain' });
             const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = "nota_editada" + document.getElementById('formatSelector').value;
+            link.href = URL.createObjectURL(blob);
+            link.download = nombreFinal;
             link.click();
-            status.innerText = "¡Descargado!";
+            URL.revokeObjectURL(link.href);
         }
     </script>
 </body>
