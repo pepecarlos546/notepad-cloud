@@ -7,26 +7,26 @@
     <style>
         :root { --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --accent: #238636; --border: #30363d; --blue: #58a6ff; }
         body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
         .toolbar { background: var(--panel); padding: 12px 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         .logo { font-weight: bold; color: var(--blue); letter-spacing: 1px; font-size: 14px; text-transform: uppercase; }
-        
-        #editor { flex-grow: 1; background: var(--bg); color: #e6edf3; border: none; padding: 25px; font-size: 18px; font-family: 'Consolas', 'Monaco', monospace; outline: none; resize: none; line-height: 1.6; width: 100%; box-sizing: border-box; }
-        
+        textarea { flex-grow: 1; background: var(--bg); color: #e6edf3; border: none; padding: 25px; font-size: 18px; font-family: 'Consolas', 'Monaco', monospace; outline: none; resize: none; line-height: 1.6; width: 100%; box-sizing: border-box; }
         .status-bar { font-size: 12px; padding: 6px 20px; background: var(--panel); color: #8b949e; display: flex; justify-content: space-between; border-top: 1px solid var(--border); }
         
-        /* Estilo oculto para el truco de la URL */
-        #launch-btn { background: transparent; border: 1px solid var(--border); color: var(--blue); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 15px; }
-        #launch-btn:hover { background: var(--border); }
+        /* Capa para el primer clic */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.9); z-index: 1000; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
-    <div class="toolbar">
-        <span class="logo">CLOUDPAD</span>
-        <button id="launch-btn" onclick="abrirEnBlank()">🚀 Abrir en modo invisible (about:blank)</button>
+    <div id="overlay" onclick="lanzarInvisible()">
+        <h2 style="color: var(--blue)">Haz clic para iniciar CloudPad (Modo Invisible)</h2>
     </div>
 
-    <textarea id="editor" spellcheck="false" placeholder="Escribe aquí tus notas... Se guardan automáticamente."></textarea>
+    <div class="toolbar">
+        <span class="logo">CLOUDPAD</span>
+    </div>
+
+    <textarea id="editor" spellcheck="false" placeholder="Escribe aquí..."></textarea>
 
     <div class="status-bar">
         <span>© 2026 CloudPad Pro</span>
@@ -35,37 +35,41 @@
 
     <script>
         const editor = document.getElementById('editor');
-        const charCount = document.getElementById('char-count');
 
-        // Función mágica para cambiar el link a about:blank
-        function abrirEnBlank() {
-            const htmlContent = document.documentElement.outerHTML;
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            
-            // Abrimos ventana nueva
+        function lanzarInvisible() {
+            // Si ya estamos en about:blank, solo quitamos el aviso
+            if (window.location.href === "about:blank") {
+                document.getElementById('overlay').classList.add('hidden');
+                return;
+            }
+
+            const html = document.documentElement.outerHTML;
             const nuevaVentana = window.open('about:blank', '_blank');
-            
-            // Inyectamos el código actual en la página en blanco
-            nuevaVentana.document.open();
-            nuevaVentana.document.write(htmlContent);
-            nuevaVentana.document.close();
+            if (nuevaVentana) {
+                nuevaVentana.document.open();
+                nuevaVentana.document.write(html);
+                nuevaVentana.document.close();
+                // Cerramos la pestaña original para que solo quede la invisible
+                window.close();
+            } else {
+                alert("Por favor, permite las ventanas emergentes para el modo invisible.");
+                document.getElementById('overlay').classList.add('hidden');
+            }
         }
 
-        // Lógica de guardado y contador
         editor.addEventListener('input', () => {
             localStorage.setItem('cloudpad_temp', editor.value);
-            actualizarContador();
+            document.getElementById('char-count').innerText = "Caracteres: " + editor.value.length;
         });
 
-        function actualizarContador() {
-            charCount.innerText = "Caracteres: " + editor.value.length;
-        }
-
-        window.onload = () => { 
-            const contenido = localStorage.getItem('cloudpad_temp');
-            if (contenido) editor.value = contenido;
-            actualizarContador();
+        window.onload = () => {
+            editor.value = localStorage.getItem('cloudpad_temp') || "";
+            document.getElementById('char-count').innerText = "Caracteres: " + editor.value.length;
+            
+            // Si ya se abrió en about:blank, ocultamos el cartel automáticamente
+            if (window.location.href === "about:blank") {
+                document.getElementById('overlay').classList.add('hidden');
+            }
         };
     </script>
 </body>
