@@ -12,14 +12,15 @@
         textarea { flex-grow: 1; background: var(--bg); color: #e6edf3; border: none; padding: 25px; font-size: 18px; font-family: 'Consolas', 'Monaco', monospace; outline: none; resize: none; line-height: 1.6; width: 100%; box-sizing: border-box; }
         .status-bar { font-size: 12px; padding: 6px 20px; background: var(--panel); color: #8b949e; display: flex; justify-content: space-between; border-top: 1px solid var(--border); }
         
-        /* Capa para el primer clic */
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.9); z-index: 1000; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        /* Capa de inicio */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; text-align: center; }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div id="overlay" onclick="lanzarInvisible()">
-        <h2 style="color: var(--blue)">Haz clic para iniciar CloudPad (Modo Invisible)</h2>
+        <h2 style="color: var(--blue)">CLOUDPAD</h2>
+        <p style="color: var(--text)">Haz clic para entrar al modo invisible</p>
     </div>
 
     <div class="toolbar">
@@ -35,25 +36,31 @@
 
     <script>
         const editor = document.getElementById('editor');
+        const overlay = document.getElementById('overlay');
 
         function lanzarInvisible() {
-            // Si ya estamos en about:blank, solo quitamos el aviso
-            if (window.location.href === "about:blank") {
-                document.getElementById('overlay').classList.add('hidden');
-                return;
-            }
-
-            const html = document.documentElement.outerHTML;
+            // Generamos el contenido eliminando el script de redirección para la nueva pestaña
+            // así evitamos el bucle infinito.
+            const selfContent = document.documentElement.outerHTML;
+            
             const nuevaVentana = window.open('about:blank', '_blank');
             if (nuevaVentana) {
                 nuevaVentana.document.open();
-                nuevaVentana.document.write(html);
+                nuevaVentana.document.write(selfContent);
                 nuevaVentana.document.close();
-                // Cerramos la pestaña original para que solo quede la invisible
-                window.close();
+                
+                // Opcional: Intentar cerrar la pestaña original
+                // window.close(); 
             } else {
-                alert("Por favor, permite las ventanas emergentes para el modo invisible.");
-                document.getElementById('overlay').classList.add('hidden');
+                alert("Por favor, permite las ventanas emergentes.");
+            }
+        }
+
+        // Esta función decide si mostrar el cartel o no
+        function verificarEstado() {
+            // Si la URL es about:blank o empieza con 'blob:', estamos en el modo invisible
+            if (window.location.href === "about:blank" || window.location.protocol === "blob:") {
+                overlay.classList.add('hidden');
             }
         }
 
@@ -63,13 +70,9 @@
         });
 
         window.onload = () => {
+            verificarEstado();
             editor.value = localStorage.getItem('cloudpad_temp') || "";
             document.getElementById('char-count').innerText = "Caracteres: " + editor.value.length;
-            
-            // Si ya se abrió en about:blank, ocultamos el cartel automáticamente
-            if (window.location.href === "about:blank") {
-                document.getElementById('overlay').classList.add('hidden');
-            }
         };
     </script>
 </body>
